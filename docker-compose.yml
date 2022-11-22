@@ -1,0 +1,21 @@
+networks:
+  monitor-net:
+    driver: bridge
+
+services:
+  poifier-client:
+    container_name: poifier-client
+    build:
+      context: ./poifier
+    networks:
+       - monitor-net
+    restart: unless-stopped
+    tty: true
+    command:
+      - '--poifier-token=${TOKEN}'
+      - '--ethereum-endpoint=${ETH_ENDPOINT}'
+      - '--mainnet-subgraph-endpoint=${SUBGRAPH_ENDPOINT}'
+      - '--graph-node-status-endpoint=${GRAPH_NODE}'
+      - '--poifier-server=${POI_SERVER}'
+      - '--mnemonic=${MNEMONIC}'
+      - '--indexer-address=${INDEXER_ADDRESS}'
