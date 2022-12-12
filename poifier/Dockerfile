@@ -10,4 +10,4 @@ RUN pip3 install -r requirements.txt
 
 COPY . .
 
-ENTRYPOINT [ "python3", "./poifier-client-sign.py" ]
+ENTRYPOINT [ "python3", "./poifier-client-multichain.py" ]
