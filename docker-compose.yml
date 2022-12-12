@@ -11,11 +11,15 @@ services:
        - monitor-net
     restart: unless-stopped
     tty: true
-    command:
+    volumes:
+      - ./configs:/root/configs/ 
+    command: 
       - '--poifier-token=${TOKEN}'
-      - '--ethereum-endpoint=${ETH_ENDPOINT}'
-      - '--mainnet-subgraph-endpoint=${SUBGRAPH_ENDPOINT}'
+      - '--subgraph-endpoint=${SUBGRAPH_ENDPOINT}'
       - '--graph-node-status-endpoint=${GRAPH_NODE}'
       - '--poifier-server=${POI_SERVER}'
       - '--mnemonic=${MNEMONIC}'
       - '--indexer-address=${INDEXER_ADDRESS}'
+      - '--graph-node-config=/root/configs/config.toml'
+      - '--epoch-subgraph-endpoint=https://api.thegraph.com/subgraphs/name/graphprotocol/goerli-epoch-block-oracle'
+      - '--poifier-token-network=goerli'
