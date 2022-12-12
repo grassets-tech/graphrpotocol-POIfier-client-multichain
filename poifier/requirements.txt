@@ -3,3 +3,4 @@ python_graphql_client
 hdwallet
 web3
 eth_account
+toml
