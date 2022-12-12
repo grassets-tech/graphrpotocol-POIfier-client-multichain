@@ -14,7 +14,6 @@ services:
     volumes:
       - ./configs:/root/configs/ 
     command: 
-      - '--poifier-token=${TOKEN}'
       - '--subgraph-endpoint=${SUBGRAPH_ENDPOINT}'
       - '--graph-node-status-endpoint=${GRAPH_NODE}'
       - '--poifier-server=${POI_SERVER}'
