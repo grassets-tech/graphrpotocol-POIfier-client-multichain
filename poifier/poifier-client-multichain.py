@@ -155,7 +155,9 @@ def getToken(mnemonic, networks, indexer_address, poifier_token_network):
     msghash = encode_defunct(text='RYABINA_POI_HUB')
     sign_hash = web3.eth.account.sign_message(msghash, private_key)
     logging.info('Message signed with: {}'.format(sign_hash.signature.hex()))
-    return '{}:{}'.format(indexer_address,sign_hash)
+    poifier_token = '{}:{}'.format(indexer_address.lower(),sign_hash.signature.hex())
+    logging.info('POIfier TOKEN: {}'.format(poifier_token))
+    return poifier_token
 
 def getSubgraphs(graphql_endpoint):
     """ Gets subgraphs from the given node.
@@ -240,7 +242,7 @@ def getStartBlockFromOracle(epoch, subgraph_endpoint):
 
 def getBlockHash(block_number, endpoint, payload):
     """ Gets blockhash for given block for given chain. """
-    payload['params'][0] = payload['params'][0].format(hex(int(block_number)))   
+    payload['params'][0] = payload['params'][0].format(hex(block_number))   
     logging.info('Quering Block hash: {} query: {}'.format(endpoint, payload))
     try:
         response = requests.post(endpoint, json=payload).json()
@@ -339,11 +341,11 @@ def getEpochBlockRangeFromOracle(epoch_range, args, networks):
         block_numbers = getStartBlockFromOracle(epoch, args.epoch_subgraph_endpoint) # returns dict {'network': block}
         for network, block_number in block_numbers.items():
             if networks.get(network):
-                block_hash = getBlockHash(block_number, networks[network], PAYLOADS_GET_BLOCK_BY_NUMBER[network])
+                block_hash = getBlockHash(int(block_number), networks[network], PAYLOADS_GET_BLOCK_BY_NUMBER[network])
                 if not epoch_block_range.get(network):
-                    epoch_block_range[network] = [{'epoch': epoch, 'block': block_number, 'hash': block_hash}]
+                    epoch_block_range[network] = [{'epoch': epoch, 'block': int(block_number), 'hash': block_hash}]
                 else:
-                    epoch_block_range[network].append({'epoch': epoch, 'block': block_number, 'hash': block_hash})
+                    epoch_block_range[network].append({'epoch': epoch, 'block': int(block_number), 'hash': block_hash})
     return  epoch_block_range
 
 def getBlockHashRange(block_ranges, networks):
@@ -409,8 +411,10 @@ def main():
         for item in poi_report:
             logging.info(item)
         if not args.poifier_token:
-            getToken(args.mnemonic, networks, args.indexer_address, args.poifier_token_network)
-        uploadPoi(args.poifier_server, args.poifier_token, poi_report)
+            poifier_token = getToken(args.mnemonic, networks, args.indexer_address, args.poifier_token_network)
+        else:
+            poifier_token = args.poifier_token
+        uploadPoi(args.poifier_server, poifier_token, poi_report)
         time.sleep(SLEEP)
 
 if __name__ == "__main__":
