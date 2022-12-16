@@ -5,25 +5,25 @@
 ########################################################################
 #!/usr/bin/env python3
 
-from python_graphql_client import GraphqlClient
-from string import Template
-from urllib.parse import urljoin
 import argparse
 import logging
 import requests
 import sys
 import time
+from python_graphql_client import GraphqlClient
+from string import Template
+from urllib.parse import urljoin
 from hdwallet import HDWallet
 from hdwallet.symbols import ETH
 from eth_account.messages import encode_defunct
 from web3 import Web3
-from typing import List
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s',level=logging.INFO)
 INDEXER_REF = '0x0000000000000000000000000000000000000000'
 LAST_N_EPOCH = 10
 LAST_N_1K_BLOCK = 10
 SLEEP = 14400 # Run script every 4 hrs
+MSG = 'RYABINA_POI_HUB'
 
 CHAIN_BY_CAIP2_AlIAS = {
   'eip155:1': 'mainnet',
@@ -77,7 +77,7 @@ def get_token(mnemonic, indexer_address):
     private_key = hdwallet.private_key()
 
     web3 = Web3()
-    msghash = encode_defunct(text='RYABINA_POI_HUB')
+    msghash = encode_defunct(text=MSG)
     sign_hash = web3.eth.account.sign_message(msghash, private_key)
     logging.info('Message signed with: {}'.format(sign_hash.signature.hex()))
     poifier_token = '{}:{}'.format(indexer_address.lower(),sign_hash.signature.hex())
@@ -103,12 +103,6 @@ def get_subgraphs(graphql_endpoint):
                         chainHeadBlock {
                             number
                         }
-                        latestBlock {
-                            number
-                        }
-                        latestBlock {
-                            hash
-                        }
                         }
                     }
                 }
@@ -129,8 +123,6 @@ def get_subgraphs(graphql_endpoint):
                 subgraphs[subgraph['subgraph']] = {
                     'network': subgraph['chains'][0]['network'],
                     'chainHeadBlock': int(subgraph['chains'][0]['chainHeadBlock']['number']),
-                    'latestBlock_number': int(subgraph['chains'][0]['latestBlock']['number']),
-                    'latestBlock_hash': subgraph['chains'][0]['latestBlock']['hash']
                 }
         for key, val in subgraphs.items():
             logging.info('{}:{}'.format(key,val))
@@ -224,20 +216,34 @@ def get_poi(indexer_id, block_number, block_hash, subgraph_ipfs_hash, graphql_en
         logging.info('Warning: no POI found for subgraph {}'.format(subgraph_ipfs_hash))
     return poi
 
-def get_poi_report_by_n_blocks(subgraphs, graphql_endpoint):
+def get_last_n_block_range(subgraphs):
+    block_range = {}
+    for subgraph, attr in subgraphs.items():
+        if not block_range.get(attr['network']):
+            block_range[attr['network']] = [(attr['chainHeadBlock'] // 1000 - i) * 1000 for i in range(0,LAST_N_1K_BLOCK)]
+    return block_range
+
+def get_last_n_block_hash_range(block_range, graphql_endpoint):
+    block_hash_range = {}
+    for network, blocks in block_range.items():
+        for block_number in blocks:
+            block_hash = get_hash_from_block(graphql_endpoint, network, block_number)
+            if not block_hash_range.get(network):
+                block_hash_range[network] = [{'block': block_number, 'hash': block_hash}]
+            else:
+                block_hash_range[network].append({'block': block_number, 'hash': block_hash})
+    return block_hash_range
+
+def get_poi_report_by_n_blocks(subgraphs, block_hash_range, graphql_endpoint):
     poi_report = []
     for subgraph, attr in subgraphs.items():
-        for block_number in [(attr['latestBlock_number'] // 1000 - i) * 1000 for i in range(0,LAST_N_1K_BLOCK)]:
-            if block_number == 0:
-                break
-            else:
-                block_hash=get_hash_from_block(graphql_endpoint, attr['network'], block_number)
-                poi = get_poi(INDEXER_REF, block_number, block_hash, subgraph, graphql_endpoint)
-                if poi:
-                    poi_report.append({'block':block_number, 'deployment': subgraph, 'poi': poi})
+        for block_hash in block_hash_range[attr['network']]:
+            poi = get_poi(INDEXER_REF, block_hash['block'], block_hash['hash'], subgraph, graphql_endpoint)
+            if poi:
+                poi_report.append({'block':block_hash['block'], 'deployment': subgraph, 'poi': poi})
     return poi_report
 
-def get_poi_report_by_n_epochs(subgraphs, graphql_endpoint, epochs):
+def get_poi_report_by_n_epochs(subgraphs, epochs, graphql_endpoint):
     poi_report = []
     for subgraph, attr in subgraphs.items():
         for epoch_block in epochs[attr['network']]:
@@ -278,9 +284,13 @@ def main():
         validate_token_keys(args)
         poifier_token = args.poifier_token if args.poifier_token else get_token(args.mnemonic, args.indexer_address)
         subgraphs = get_subgraphs(args.graph_node_status_endpoint)
-        epochs = get_last_n_epochs_from_oracle(args.indexer_agent_epoch_subgraph_endpoint)
-        poi_by_block = get_poi_report_by_n_blocks(subgraphs, args.graph_node_status_endpoint)
-        poi_by_epoch = get_poi_report_by_n_epochs(subgraphs, args.graph_node_status_endpoint, epochs)
+        block_range = get_last_n_block_range(subgraphs)
+        print(block_range)
+        block_hash_range = get_last_n_block_hash_range(block_range, args.graph_node_status_endpoint)
+        print(block_hash_range)
+        epoch_range = get_last_n_epochs_from_oracle(args.indexer_agent_epoch_subgraph_endpoint)
+        poi_by_block = get_poi_report_by_n_blocks(subgraphs, block_hash_range, args.graph_node_status_endpoint)
+        poi_by_epoch = get_poi_report_by_n_epochs(subgraphs, epoch_range, args.graph_node_status_endpoint)
         poi_report = [*poi_by_block, *poi_by_epoch]
         for item in poi_report:
             logging.info(item)
@@ -290,6 +300,7 @@ def main():
         upload_poi(args.poifier_server, poifier_token, poi_report)
         logging.info('POIfier finished in {}'.format(time.time() - start_time))
         logging.info('----------------------------------------')
+        logging.info('POIfier sleeping ...')
         time.sleep(SLEEP)
 
 if __name__ == "__main__":
