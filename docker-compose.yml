@@ -14,11 +14,8 @@ services:
     volumes:
       - ./configs:/root/configs/ 
     command: 
-      - '--subgraph-endpoint=${SUBGRAPH_ENDPOINT}'
       - '--graph-node-status-endpoint=${GRAPH_NODE}'
       - '--poifier-server=${POI_SERVER}'
-      - '--poifier-token-network=${POI_NETWORK}'
       - '--mnemonic=${MNEMONIC}'
       - '--indexer-address=${INDEXER_ADDRESS}'
-      - '--graph-node-config=${GRAPH_NODE_CONFIG}'
-      - '--epoch-subgraph-endpoint=${EPOCH_SUBGRAPH_ENDPOINT}'
+      - '--indexer-agent-epoch-subgraph-endpoint=${INDEXER_AGENT_EPOCH_SUBGRAPH_ENDPOINT}'
