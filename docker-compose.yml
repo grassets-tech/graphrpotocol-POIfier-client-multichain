@@ -11,8 +11,6 @@ services:
        - monitor-net
     restart: unless-stopped
     tty: true
-    volumes:
-      - ./configs:/root/configs/ 
     command: 
       - '--graph-node-status-endpoint=${GRAPH_NODE}'
       - '--poifier-server=${POI_SERVER}'
